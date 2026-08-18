@@ -1,21 +1,16 @@
-# Environment variables
-.env
-*.env
-backend/.env
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-backend/venv/
-.pytest_cache/
-*.log
-
-# Node & Frontend
 node_modules/
 dist/
-.vite/
+.env
+.env.*
+!.env.example
 
-# Database
-*.sqlite3
+__pycache__/
+*.pyc
+.pytest_cache/
+
 *.db
+*.sqlite
+*.sqlite3
+
+.venv/
+venv/
