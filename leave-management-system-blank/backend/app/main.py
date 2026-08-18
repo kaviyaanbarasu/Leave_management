@@ -12,6 +12,8 @@ from app.routers import (
     holidays_router,
     accrual_policies_router,
     leave_requests_router,
+    auth_router,
+    approvals_router,
 )
 
 
@@ -47,12 +49,14 @@ app.add_middleware(
 )
 
 # Register API Routers
+app.include_router(auth_router, prefix="/api")
 app.include_router(employees_router, prefix="/api")
 app.include_router(locations_router, prefix="/api")
 app.include_router(leave_types_router, prefix="/api")
 app.include_router(holidays_router, prefix="/api")
 app.include_router(accrual_policies_router, prefix="/api")
 app.include_router(leave_requests_router, prefix="/api")
+app.include_router(approvals_router, prefix="/api")
 
 
 @app.get("/", tags=["Health"])

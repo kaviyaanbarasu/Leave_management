@@ -3,6 +3,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
 
 
+from app.schemas.approval import LeaveApprovalResponse
+
+
 class LeaveRequestCreate(BaseModel):
     employee_id: str = Field(..., min_length=1)
     leave_type_id: str = Field(..., min_length=1)
@@ -14,6 +17,7 @@ class LeaveRequestCreate(BaseModel):
 class LeaveRequestResponse(BaseModel):
     request_id: str
     employee_id: str
+    employee_name: Optional[str] = None
     leave_type_id: str
     start_date: date
     end_date: date
@@ -21,9 +25,13 @@ class LeaveRequestResponse(BaseModel):
     working_days: float
     reason: str
     status: str
+    current_tier: Optional[int] = 1
+    current_approver_id: Optional[str] = None
+    current_approver_name: Optional[str] = None
     applied_on: datetime
     reserved_days: Optional[float] = None
     remaining_available_balance: Optional[float] = None
+    approvals: Optional[List[LeaveApprovalResponse]] = []
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -62,3 +70,9 @@ class EmployeeBalanceResponse(BaseModel):
     employee_name: Optional[str] = None
     location_id: Optional[str] = None
     balances: List[BalanceItemResponse]
+
+
+class BalanceAdjustmentRequest(BaseModel):
+    leave_type_id: str = Field(..., min_length=1)
+    adjustment_days: float = Field(..., description="Positive to add days, negative to deduct days")
+    reason: Optional[str] = Field("Manual balance adjustment", description="Audit reason for adjustment")

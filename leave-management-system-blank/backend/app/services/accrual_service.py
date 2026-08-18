@@ -49,9 +49,8 @@ class AccrualService:
 
         # Filter and rank:
         # Match grade if possible; otherwise match fallback where grade is None or ""
-        exact_grade_policies = [p for p in policies if p.grade and p.grade.upper() == employee.grade.upper()]
+        exact_grade_policies = [p for p in policies if p.grade and p.grade.upper() == (employee.grade or "").upper()]
         if exact_grade_policies:
-            # Sort by highest tenure_from_months
             exact_grade_policies.sort(key=lambda p: p.tenure_from_months, reverse=True)
             return exact_grade_policies[0]
 
@@ -81,7 +80,7 @@ class AccrualService:
         """
         Executes monthly accrual across all active employees.
         Idempotent: Uses AccrualRecord table to prevent multiple accruals for the same month.
-        Respects max_balance.
+        Respects max_balance cap and provides explainable diagnostics.
         """
         now = datetime.now(timezone.utc)
         target_year = year if year is not None else now.year
@@ -120,30 +119,54 @@ class AccrualService:
                 bal = balance_service.get_or_create_balance(emp.employee_id, lt.leave_type_id, db)
                 prev_available = bal.available_balance
 
+                # Find policy (even for skipped/capped records so we can report policy details)
+                policy = self.find_applicable_policy(emp, lt.leave_type_id, as_of_date, db)
+                policy_name = f"{policy.grade or 'All Grades'} {lt.name} Policy" if policy else "No Policy"
+
                 if existing_record:
                     run_items.append(
                         AccrualRunItem(
                             employee_id=emp.employee_id,
+                            employee_name=emp.name,
                             leave_type_id=lt.leave_type_id,
+                            leave_type_name=lt.name,
+                            grade=emp.grade,
+                            policy_id=existing_record.policy_id or (policy.policy_id if policy else None),
+                            policy_name=policy_name,
+                            policy_grade=policy.grade if policy else None,
+                            monthly_accrual=policy.monthly_accrual if policy else 0.0,
+                            max_balance=policy.max_balance if policy else 0.0,
+                            current_balance=prev_available,
+                            actual_accrual=0.0,
                             accrued_amount=0.0,
                             previous_balance=prev_available,
                             new_balance=prev_available,
                             status="SKIPPED_ALREADY_ACCRUED",
+                            reason=f"Monthly entitlement for {target_month:02d}/{target_year} was already accrued on {existing_record.accrued_at.strftime('%Y-%m-%d')}.",
                         )
                     )
                     continue
 
-                # 2. Find policy
-                policy = self.find_applicable_policy(emp, lt.leave_type_id, as_of_date, db)
                 if not policy:
                     run_items.append(
                         AccrualRunItem(
                             employee_id=emp.employee_id,
+                            employee_name=emp.name,
                             leave_type_id=lt.leave_type_id,
+                            leave_type_name=lt.name,
+                            grade=emp.grade,
+                            policy_id=None,
+                            policy_name="No Active Policy",
+                            policy_grade=None,
+                            monthly_accrual=0.0,
+                            max_balance=0.0,
+                            current_balance=prev_available,
+                            actual_accrual=0.0,
                             accrued_amount=0.0,
                             previous_balance=prev_available,
                             new_balance=prev_available,
                             status="NO_POLICY",
+                            reason=f"No matching accrual policy found for location {emp.location_id}, grade {emp.grade}.",
                         )
                     )
                     continue
@@ -153,19 +176,25 @@ class AccrualService:
                 if current_total >= policy.max_balance:
                     actual_accrual = 0.0
                     status = "CAPPED_AT_MAX"
+                    reason = f"Current balance ({current_total:.2f} days) has reached the maximum policy cap ({policy.max_balance:.2f} days)."
                 else:
                     room = policy.max_balance - current_total
                     actual_accrual = round(min(policy.monthly_accrual, room), 2)
                     status = "ACCRUED"
+                    if actual_accrual < policy.monthly_accrual:
+                        reason = f"Accrued {actual_accrual:.2f} days (partially capped to meet maximum balance {policy.max_balance:.2f} days)."
+                    else:
+                        reason = f"Accrued {actual_accrual:.2f} days as per {policy_name} ({policy.monthly_accrual:.2f} days/month)."
 
                 # 4. Apply accrual to balance
                 bal.accrued = round(bal.accrued + actual_accrual, 2)
                 bal.as_of_date = as_of_date
 
-                # 5. Record accrual transaction for idempotency
+                # 5. Record accrual transaction for idempotency & audit
                 accrual_record = AccrualRecord(
                     employee_id=emp.employee_id,
                     leave_type_id=lt.leave_type_id,
+                    policy_id=policy.policy_id,
                     year=target_year,
                     month=target_month,
                     accrued_amount=actual_accrual,
@@ -181,11 +210,22 @@ class AccrualService:
                 run_items.append(
                     AccrualRunItem(
                         employee_id=emp.employee_id,
+                        employee_name=emp.name,
                         leave_type_id=lt.leave_type_id,
+                        leave_type_name=lt.name,
+                        grade=emp.grade,
+                        policy_id=policy.policy_id,
+                        policy_name=policy_name,
+                        policy_grade=policy.grade,
+                        monthly_accrual=policy.monthly_accrual,
+                        max_balance=policy.max_balance,
+                        current_balance=prev_available,
+                        actual_accrual=actual_accrual,
                         accrued_amount=actual_accrual,
                         previous_balance=prev_available,
                         new_balance=new_available,
                         status=status,
+                        reason=reason,
                     )
                 )
 

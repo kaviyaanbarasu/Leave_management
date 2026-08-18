@@ -1,49 +1,14 @@
 import pytest
 from datetime import date
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-from app.database import Base, get_db
 from app.main import app
-from app.seed import seed_database
 from app.services.holiday_service import holiday_service
 from app.models.location import Location
 from app.models.employee import Employee
 from app.models.leave_type import LeaveType
 from app.models.leave_request import EmployeeLeaveBalance
 from app.services.accrual_service import accrual_service
-
-# Create in-memory SQLite database with StaticPool for test sharing
-TEST_DATABASE_URL = "sqlite:///:memory:"
-test_engine = create_engine(
-    TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
-
-
-def override_get_db():
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-app.dependency_overrides[get_db] = override_get_db
-
-
-@pytest.fixture(scope="function", autouse=True)
-def setup_test_db():
-    Base.metadata.create_all(bind=test_engine)
-    db = TestingSessionLocal()
-    seed_database(db)
-    yield
-    db.close()
-    Base.metadata.drop_all(bind=test_engine)
-
+from tests.conftest import TestingSessionLocal
 
 client = TestClient(app)
 
@@ -264,7 +229,7 @@ def test_leave_balance_and_pending_reservation():
     )
     assert req_res.status_code == 201
     req_data = req_res.json()
-    assert req_data["status"] == "PENDING"
+    assert req_data["status"].startswith("PENDING")
     assert req_data["working_days"] == 3.0
     assert req_data["reserved_days"] == 3.0
     assert req_data["remaining_available_balance"] == 7.0
@@ -393,3 +358,186 @@ def test_monthly_accrual_idempotency():
     for detail in data2["details"]:
         assert detail["status"] == "SKIPPED_ALREADY_ACCRUED"
         assert detail["accrued_amount"] == 0.0
+
+
+# ==========================================
+# 19. Leave Approval Deducts Balance
+# ==========================================
+def test_leave_approval_deducts_balance():
+    # Submit request for 3 working days
+    req_res = client.post(
+        "/api/leave-requests",
+        json={
+            "employee_id": "E101",
+            "leave_type_id": "BLR-PTO",
+            "start_date": "2026-10-19",
+            "end_date": "2026-10-22",
+            "reason": "Approval test vacation",
+        },
+    )
+    assert req_res.status_code == 201
+    req_id = req_res.json()["request_id"]
+
+    # Multi-tier approval: Tier 1 (Manager M201 - Kaviya) -> Tier 2 (HR ADMIN01 - Ahallya Nethra)
+    client.post(f"/api/leave-requests/{req_id}/approve-tier?approver_id=M201", json={"comments": "Tier 1 Approved by Kaviya"})
+    approve_res = client.post(f"/api/leave-requests/{req_id}/approve-tier?approver_id=ADMIN01", json={"comments": "Final HR Approved by Ahallya Nethra"})
+    assert approve_res.status_code == 200
+    assert approve_res.json()["status"] == "APPROVED"
+
+    # Verify balance: pending is 0, used is 3.0
+    bal_res = client.get("/api/employees/E101/balance")
+    pto_bal = next(b for b in bal_res.json()["balances"] if b["leave_type_id"] == "BLR-PTO")
+    assert pto_bal["pending"] == 0.0
+    assert pto_bal["used"] >= 3.0
+
+
+# ==========================================
+# 20. Leave Rejection Releases Balance
+# ==========================================
+def test_leave_rejection_releases_balance():
+    # Submit request
+    req_res = client.post(
+        "/api/leave-requests",
+        json={
+            "employee_id": "E101",
+            "leave_type_id": "BLR-CASUAL",
+            "start_date": "2026-11-02",
+            "end_date": "2026-11-03",
+            "reason": "Rejection test",
+        },
+    )
+    assert req_res.status_code == 201
+    req_id = req_res.json()["request_id"]
+
+    # Reject request via Manager M201 (Kaviya)
+    reject_res = client.post(f"/api/leave-requests/{req_id}/reject-tier?approver_id=M201", json={"comments": "Rejection reason by Kaviya"})
+    assert reject_res.status_code == 200
+    assert reject_res.json()["status"] == "REJECTED"
+
+    # Verify pending balance released
+    bal_res = client.get("/api/employees/E101/balance")
+    cas_bal = next(b for b in bal_res.json()["balances"] if b["leave_type_id"] == "BLR-CASUAL")
+    assert cas_bal["pending"] == 0.0
+
+
+# ==========================================
+# 21. Balance Adjustment Endpoint
+# ==========================================
+def test_adjust_employee_balance():
+    # Add 5 days of PTO
+    adj_res = client.post(
+        "/api/employees/E101/adjust-balance",
+        json={
+            "leave_type_id": "BLR-PTO",
+            "adjustment_days": 5.0,
+            "reason": "Special performance award",
+        },
+    )
+    assert adj_res.status_code == 200
+    pto_bal = next(b for b in adj_res.json()["balances"] if b["leave_type_id"] == "BLR-PTO")
+    assert pto_bal["adjusted"] >= 5.0
+
+
+# ==========================================
+# 22. Google Calendar Holiday Status
+# ==========================================
+def test_google_holiday_status():
+    res = client.get("/api/holidays/google-status")
+    assert res.status_code == 200
+    data = res.json()
+    assert "supported_locations" in data
+    assert "BLR" in data["supported_locations"]
+    assert "SG" in data["supported_locations"]
+    assert "NY" in data["supported_locations"]
+    assert "DXB" in data["supported_locations"]
+
+
+# ==========================================
+# 23. Google Calendar Holiday Sync Mocked
+# ==========================================
+def test_google_holiday_sync_mock(monkeypatch):
+    from app.services.holiday_service import GoogleCalendarHolidayProvider
+    from datetime import date
+
+    # Mock Google Calendar fetch to simulate live Google Calendar API
+    mock_holidays = [
+        {
+            "name": "Republic Day (Google Sync)",
+            "date": date(2026, 1, 26),
+            "type": "PUBLIC",
+            "description": "National Holiday synced via Google Calendar API",
+        },
+        {
+            "name": "Independence Day (Google Sync)",
+            "date": date(2026, 8, 15),
+            "type": "PUBLIC",
+            "description": "National Holiday synced via Google Calendar API",
+        },
+    ]
+
+    monkeypatch.setattr(GoogleCalendarHolidayProvider, "fetch_holidays", lambda cal_id, yr, key: mock_holidays)
+
+    res = client.post(
+        "/api/holidays/sync-google",
+        json={
+            "location_id": "BLR",
+            "year": 2026,
+            "api_key": "AIzaSyTestKey",
+        },
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert data["data"]["synced_count"] == 2
+
+    # Verify holidays were saved in database
+    hols_res = client.get("/api/holidays?location_id=BLR&year=2026")
+    assert hols_res.status_code == 200
+    hol_names = [h["name"] for h in hols_res.json()]
+    assert "Republic Day (Google Sync)" in hol_names
+    assert "Independence Day (Google Sync)" in hol_names
+
+
+def test_auth_login_employee():
+    """Verify regular employee authentication and profile scoping."""
+    res = client.post("/api/auth/login", json={"username": "E101", "password": "password123"})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["user"]["employee_id"] == "E101"
+    assert data["user"]["name"] == "Vijesh"
+    assert data["user"]["email"] == "vijeshthamodharan@gmail.com"
+    assert data["user"]["location_id"] == "BLR"
+    assert data["user"]["role"] == "EMPLOYEE"
+    assert data["token"].startswith("session-E101")
+
+
+def test_auth_login_admin():
+    """Verify HR Admin authentication and role."""
+    res = client.post("/api/auth/login", json={"username": "ADMIN01", "password": "admin123"})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["user"]["employee_id"] == "ADMIN01"
+    assert data["user"]["name"] == "Ahallya Nethra"
+    assert data["user"]["email"] == "ahallyanethrabl@gmail.com"
+    assert data["user"]["role"] == "HR_ADMIN"
+
+
+def test_auth_login_invalid():
+    """Verify error on invalid employee ID."""
+    res = client.post("/api/auth/login", json={"username": "NONEXISTENT", "password": "password123"})
+    assert res.status_code == 401
+    assert "not found" in res.json()["detail"].lower()
+
+
+def test_auth_get_personas():
+    """Verify personas endpoint returns all location demo personas."""
+    res = client.get("/api/auth/personas")
+    assert res.status_code == 200
+    personas = res.json()
+    assert len(personas) >= 5
+    emp_ids = [p["employee_id"] for p in personas]
+    assert "E101" in emp_ids
+    assert "E102" in emp_ids
+    assert "E103" in emp_ids
+    assert "E104" in emp_ids
+    assert "ADMIN01" in emp_ids

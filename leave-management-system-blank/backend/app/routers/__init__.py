@@ -4,6 +4,8 @@ from app.routers.leave_types import router as leave_types_router
 from app.routers.holidays import router as holidays_router
 from app.routers.accrual_policies import router as accrual_policies_router
 from app.routers.leave_requests import router as leave_requests_router
+from app.routers.auth import router as auth_router
+from app.routers.approvals import router as approvals_router
 
 __all__ = [
     "employees_router",
@@ -12,4 +14,6 @@ __all__ = [
     "holidays_router",
     "accrual_policies_router",
     "leave_requests_router",
+    "auth_router",
+    "approvals_router",
 ]

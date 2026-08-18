@@ -15,9 +15,25 @@ class Employee(Base):
     location_id = Column(String(50), ForeignKey("locations.location_id"), nullable=False)
     joining_date = Column(Date, nullable=False)
     status = Column(String(50), nullable=False, default="ACTIVE")
+    role = Column(String(50), nullable=False, default="EMPLOYEE")
+    password = Column(String(255), nullable=True, default="password123")
+    manager_id = Column(String(50), ForeignKey("employees.employee_id"), nullable=True)
 
     # Relationships
     location = relationship("Location", back_populates="employees")
-    leave_requests = relationship("LeaveRequest", back_populates="employee", cascade="all, delete-orphan")
+    manager = relationship("Employee", remote_side=[employee_id], backref="direct_reports")
+    leave_requests = relationship("LeaveRequest", foreign_keys="[LeaveRequest.employee_id]", back_populates="employee", cascade="all, delete-orphan")
     balances = relationship("EmployeeLeaveBalance", back_populates="employee", cascade="all, delete-orphan")
     accrual_records = relationship("AccrualRecord", back_populates="employee", cascade="all, delete-orphan")
+
+    @property
+    def manager_name(self):
+        return self.manager.name if self.manager else None
+
+    @property
+    def location_name(self):
+        return self.location.name if self.location else self.location_id
+
+    @property
+    def country(self):
+        return self.location.country if self.location else None

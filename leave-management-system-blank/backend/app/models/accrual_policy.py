@@ -28,6 +28,7 @@ class AccrualRecord(Base):
     record_id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     employee_id = Column(String(50), ForeignKey("employees.employee_id"), nullable=False)
     leave_type_id = Column(String(50), ForeignKey("leave_types.leave_type_id"), nullable=False)
+    policy_id = Column(Integer, ForeignKey("accrual_policies.policy_id"), nullable=True)
     year = Column(Integer, nullable=False)
     month = Column(Integer, nullable=False)
     accrued_amount = Column(Float, nullable=False)
@@ -41,3 +42,4 @@ class AccrualRecord(Base):
     # Relationships
     employee = relationship("Employee", back_populates="accrual_records")
     leave_type = relationship("LeaveType")
+    policy = relationship("AccrualPolicy")

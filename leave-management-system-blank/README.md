@@ -69,7 +69,9 @@ python -m pytest tests -v
 - **DXB**: Dubai Office (UAE) &bull; Weekend: Friday & Saturday
 
 ### Employees & Initial Balances
-- **E101**: Arun Sharma (Bangalore, Grade G5) &bull; PTO: 10.0, CASUAL: 5.0, SICK: 5.0
+- **E101**: Vijesh (Bangalore, Grade G5) &bull; PTO: 10.0, CASUAL: 5.0, SICK: 5.0 &bull; `vijeshthamodharan@gmail.com`
+- **M201**: Kaviya (Bangalore, Grade G7, Engineering Director) &bull; PTO: 18.0, CASUAL: 6.0, SICK: 8.0 &bull; `anbarasukavya7@gmail.com`
+- **ADMIN01**: Ahallya Nethra (Bangalore, Grade G8, HR Admin) &bull; PTO: 25.0, CASUAL: 8.0, SICK: 10.0 &bull; `ahallyanethrabl@gmail.com`
 - **E102**: Mei Ling (Singapore, Grade G4) &bull; PTO: 8.0, SICK: 4.0
 - **E103**: John Miller (New York, Grade G6) &bull; PTO: 15.0, SICK: 6.0
 - **E104**: Fatima Al-Mansoor (Dubai, Grade G5) &bull; PTO: 12.0, CASUAL: 4.0, SICK: 5.0

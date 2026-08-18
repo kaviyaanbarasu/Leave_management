@@ -43,6 +43,7 @@ class AccrualRecordResponse(BaseModel):
     record_id: int
     employee_id: str
     leave_type_id: str
+    policy_id: Optional[int] = None
     year: int
     month: int
     accrued_amount: float
@@ -53,11 +54,22 @@ class AccrualRecordResponse(BaseModel):
 
 class AccrualRunItem(BaseModel):
     employee_id: str
+    employee_name: Optional[str] = None
     leave_type_id: str
-    accrued_amount: float
-    previous_balance: float
-    new_balance: float
+    leave_type_name: Optional[str] = None
+    grade: Optional[str] = None
+    policy_id: Optional[int] = None
+    policy_name: Optional[str] = None
+    policy_grade: Optional[str] = None
+    monthly_accrual: float = 0.0
+    max_balance: float = 0.0
+    current_balance: float = 0.0
+    actual_accrual: float = 0.0
+    accrued_amount: float = 0.0  # Alias/compat for tests
+    previous_balance: float = 0.0
+    new_balance: float = 0.0
     status: str  # "ACCRUED", "SKIPPED_ALREADY_ACCRUED", "CAPPED_AT_MAX", "NO_POLICY"
+    reason: Optional[str] = None
 
 
 class AccrualRunResponse(BaseModel):

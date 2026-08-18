@@ -4,9 +4,13 @@ import Dashboard from './pages/Dashboard';
 import LeaveRequestForm from './pages/LeaveRequestForm';
 import EmployeeList from './pages/EmployeeList';
 import LocationList from './pages/LocationList';
+import ApprovalsInbox from './pages/ApprovalsInbox';
+import LoginPage from './pages/LoginPage';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { api } from './api/api';
 
-export default function App() {
+function MainApp() {
+  const { currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [healthStatus, setHealthStatus] = useState(false);
 
@@ -27,6 +31,10 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  if (!currentUser) {
+    return <LoginPage />;
+  }
+
   return (
     <div className="app-container">
       <Navbar 
@@ -38,6 +46,7 @@ export default function App() {
       <main className="main-content">
         {activeTab === 'dashboard' && <Dashboard setActiveTab={setActiveTab} />}
         {activeTab === 'apply' && <LeaveRequestForm setActiveTab={setActiveTab} />}
+        {activeTab === 'approvals' && <ApprovalsInbox />}
         {activeTab === 'employees' && <EmployeeList />}
         {activeTab === 'locations' && <LocationList />}
       </main>
@@ -49,9 +58,17 @@ export default function App() {
         color: 'var(--text-muted)', 
         fontSize: '0.85rem' 
       }}>
-        <p><strong>Dynamic PTO & Leave Management System MVP</strong> &bull; Location-aware Holidays &bull; Configurable Weekend Rules &bull; Idempotent Monthly Accrual</p>
+        <p><strong>Dynamic PTO & Leave Management System</strong> &bull; Location-aware Holidays &bull; Configurable Weekend Rules &bull; Idempotent Monthly Accrual</p>
         <p style={{ marginTop: '0.25rem', fontSize: '0.775rem' }}>Strict domain isolation: Employee belongs to Location &bull; LeaveType belongs to Location &bull; No direct associations</p>
       </footer>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <MainApp />
+    </AuthProvider>
   );
 }

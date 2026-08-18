@@ -103,6 +103,32 @@ class BalanceService:
         balance.as_of_date = date.today()
         db.flush()
 
+    def initialize_employee_balances(self, employee_id: str, location_id: str, db: Session, default_opening: float = 10.0):
+        """
+        Initializes leave balance records for a newly created employee for all leave types in that location.
+        """
+        leave_types = (
+            db.query(LeaveType)
+            .filter(
+                LeaveType.location_id == location_id,
+                LeaveType.is_active == True,
+            )
+            .all()
+        )
+        for lt in leave_types:
+            self.get_or_create_balance(employee_id, lt.leave_type_id, db, initial_opening=default_opening)
+        db.flush()
+
+    def approve_reservation(self, employee_id: str, leave_type_id: str, working_days: float, db: Session):
+        """
+        Deducts from pending and adds to used when a leave request is approved.
+        """
+        balance = self.get_or_create_balance(employee_id, leave_type_id, db)
+        balance.pending = max(0.0, round(balance.pending - working_days, 2))
+        balance.used = round(balance.used + working_days, 2)
+        balance.as_of_date = date.today()
+        db.flush()
+
     def release_reservation(self, employee_id: str, leave_type_id: str, working_days: float, db: Session):
         """
         Releases reserved pending balance when a request is cancelled or rejected.
@@ -111,6 +137,22 @@ class BalanceService:
         balance.pending = max(0.0, round(balance.pending - working_days, 2))
         balance.as_of_date = date.today()
         db.flush()
+
+    def release_balance(self, employee_id: str, leave_type_id: str, working_days: float, db: Session):
+        return self.release_reservation(employee_id, leave_type_id, working_days, db)
+
+    def deduct_balance(self, employee_id: str, leave_type_id: str, working_days: float, db: Session):
+        return self.approve_reservation(employee_id, leave_type_id, working_days, db)
+
+    def adjust_balance(self, employee_id: str, leave_type_id: str, adjustment_days: float, db: Session) -> EmployeeLeaveBalance:
+        """
+        Manually adjusts employee leave balance.
+        """
+        balance = self.get_or_create_balance(employee_id, leave_type_id, db)
+        balance.adjusted = round(balance.adjusted + adjustment_days, 2)
+        balance.as_of_date = date.today()
+        db.flush()
+        return balance
 
 
 balance_service = BalanceService()

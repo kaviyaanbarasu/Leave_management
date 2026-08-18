@@ -5,7 +5,7 @@ from app.database import get_db
 from app.models.employee import Employee
 from app.models.location import Location
 from app.schemas.employee import EmployeeCreate, EmployeeUpdate, EmployeeResponse
-from app.schemas.leave_request import EmployeeBalanceResponse
+from app.schemas.leave_request import EmployeeBalanceResponse, BalanceAdjustmentRequest
 from app.services.balance_service import balance_service
 
 router = APIRouter(prefix="/employees", tags=["Employees"])
@@ -47,8 +47,16 @@ def create_employee(payload: EmployeeCreate, db: Session = Depends(get_db)):
         location_id=payload.location_id,
         joining_date=payload.joining_date,
         status=payload.status,
+        role=payload.role or "EMPLOYEE",
+        password=payload.password or "password123",
+        manager_id=payload.manager_id,
     )
     db.add(employee)
+    db.flush()
+
+    # Automatically initialize balances for all active leave types in employee's location
+    balance_service.initialize_employee_balances(employee.employee_id, employee.location_id, db)
+
     db.commit()
     db.refresh(employee)
     return employee
@@ -96,6 +104,8 @@ def update_employee(employee_id: str, payload: EmployeeUpdate, db: Session = Dep
                 detail=f"Location '{payload.location_id}' not found",
             )
         employee.location_id = payload.location_id
+        # Also ensure balances for new location leave types are initialized
+        balance_service.initialize_employee_balances(employee.employee_id, payload.location_id, db)
 
     if payload.name is not None:
         employee.name = payload.name
@@ -109,6 +119,12 @@ def update_employee(employee_id: str, payload: EmployeeUpdate, db: Session = Dep
         employee.joining_date = payload.joining_date
     if payload.status is not None:
         employee.status = payload.status
+    if payload.role is not None:
+        employee.role = payload.role
+    if payload.password is not None:
+        employee.password = payload.password
+    if payload.manager_id is not None:
+        employee.manager_id = payload.manager_id
 
     db.commit()
     db.refresh(employee)
@@ -137,3 +153,22 @@ def get_employee_balance(employee_id: str, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e),
         )
+
+
+@router.post("/{employee_id}/adjust-balance", response_model=EmployeeBalanceResponse)
+def adjust_employee_balance(employee_id: str, payload: BalanceAdjustmentRequest, db: Session = Depends(get_db)):
+    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
+    if not employee:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Employee '{employee_id}' not found",
+        )
+
+    balance_service.adjust_balance(
+        employee_id=employee_id,
+        leave_type_id=payload.leave_type_id,
+        adjustment_days=payload.adjustment_days,
+        db=db,
+    )
+    db.commit()
+    return balance_service.get_employee_balances(employee_id, db)

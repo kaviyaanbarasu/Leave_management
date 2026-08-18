@@ -5,7 +5,8 @@ from app.models.employee import Employee
 from app.models.leave_type import LeaveType
 from app.models.holiday import Holiday
 from app.models.accrual_policy import AccrualPolicy
-from app.models.leave_request import EmployeeLeaveBalance
+from app.models.leave_request import LeaveRequest, EmployeeLeaveBalance
+from app.models.approval import LeaveApproval
 
 
 def seed_database(db: Session):
@@ -156,43 +157,82 @@ def seed_database(db: Session):
             db.add(Holiday(**hol))
     db.flush()
 
-    # 5. Employees
+    # 5. Employees & Multi-Tier Hierarchy
+    # First, safely clean up deleted employees (E105 - Vikram Joshi, M202 - Rajesh Kumar) if present
+    deleted_ids = ["E105", "M202"]
+    for d_id in deleted_ids:
+        # Re-assign any employees that had deleted employee as manager
+        db.query(Employee).filter(Employee.manager_id == d_id).update({"manager_id": "M201"})
+        # Clean approvals and requests
+        db.query(LeaveApproval).filter(LeaveApproval.approver_id == d_id).delete(synchronize_session=False)
+        db.query(LeaveApproval).filter(LeaveApproval.request_id.in_(
+            db.query(LeaveRequest.request_id).filter(LeaveRequest.employee_id == d_id)
+        )).delete(synchronize_session=False)
+        db.query(LeaveRequest).filter(LeaveRequest.employee_id == d_id).delete(synchronize_session=False)
+        db.query(EmployeeLeaveBalance).filter(EmployeeLeaveBalance.employee_id == d_id).delete(synchronize_session=False)
+        db.query(Employee).filter(Employee.employee_id == d_id).delete(synchronize_session=False)
+    db.flush()
+
     employees_data = [
         {
             "employee_id": "E101",
-            "name": "Arun Sharma",
-            "email": "arun.sharma@example.com",
+            "name": "Vijesh",
+            "email": "vijeshthamodharan@gmail.com",
             "department": "Engineering",
             "designation": "Senior Software Engineer",
             "grade": "G5",
             "location_id": "BLR",
             "joining_date": date(2024, 1, 15),
             "status": "ACTIVE",
+            "role": "EMPLOYEE",
+            "password": "password123",
+            "manager_id": "M201",
             "initial_balances": {"BLR-PTO": 10.0, "BLR-CASUAL": 5.0, "BLR-SICK": 5.0},
         },
         {
+            "employee_id": "M201",
+            "name": "Kaviya",
+            "email": "anbarasukavya7@gmail.com",
+            "department": "Engineering",
+            "designation": "Director of Engineering",
+            "grade": "G7",
+            "location_id": "BLR",
+            "joining_date": date(2023, 1, 10),
+            "status": "ACTIVE",
+            "role": "MANAGER",
+            "password": "password123",
+            "manager_id": "ADMIN01",
+            "initial_balances": {"BLR-PTO": 18.0, "BLR-CASUAL": 6.0, "BLR-SICK": 8.0},
+        },
+        {
             "employee_id": "E102",
-            "name": "Mei Ling",
-            "email": "mei.ling@example.com",
-            "department": "Product",
-            "designation": "Product Manager",
-            "grade": "G4",
+            "name": "Kartik",
+            "email": "kartik@example.com",
+            "department": "Engineering",
+            "designation": "Software Engineer",
+            "grade": "G5",
             "location_id": "SG",
             "joining_date": date(2024, 6, 1),
             "status": "ACTIVE",
-            "initial_balances": {"SG-PTO": 8.0, "SG-SICK": 4.0},
+            "role": "EMPLOYEE",
+            "password": "password123",
+            "manager_id": "M201",
+            "initial_balances": {"SG-PTO": 10.0, "SG-SICK": 5.0},
         },
         {
             "employee_id": "E103",
-            "name": "John Miller",
-            "email": "john.miller@example.com",
+            "name": "Divya",
+            "email": "divya@example.com",
             "department": "Engineering",
-            "designation": "Tech Lead",
-            "grade": "G6",
+            "designation": "Software Engineer",
+            "grade": "G5",
             "location_id": "NY",
             "joining_date": date(2023, 3, 10),
             "status": "ACTIVE",
-            "initial_balances": {"NY-PTO": 15.0, "NY-SICK": 6.0},
+            "role": "EMPLOYEE",
+            "password": "password123",
+            "manager_id": "M201",
+            "initial_balances": {"NY-PTO": 12.0, "NY-SICK": 5.0},
         },
         {
             "employee_id": "E104",
@@ -204,17 +244,54 @@ def seed_database(db: Session):
             "location_id": "DXB",
             "joining_date": date(2024, 2, 1),
             "status": "ACTIVE",
+            "role": "EMPLOYEE",
+            "password": "password123",
+            "manager_id": "ADMIN01",
             "initial_balances": {"DXB-PTO": 12.0, "DXB-CASUAL": 4.0, "DXB-SICK": 5.0},
+        },
+        {
+            "employee_id": "ADMIN01",
+            "name": "Ahallya Nethra",
+            "email": "ahallyanethrabl@gmail.com",
+            "department": "Human Resources",
+            "designation": "Head of People & HR Operations",
+            "grade": "G8",
+            "location_id": "BLR",
+            "joining_date": date(2022, 1, 1),
+            "status": "ACTIVE",
+            "role": "HR_ADMIN",
+            "password": "admin123",
+            "manager_id": None,
+            "initial_balances": {"BLR-PTO": 25.0, "BLR-CASUAL": 8.0, "BLR-SICK": 10.0},
         },
     ]
 
+    # 5. Employees & Multi-Tier Hierarchy (Pass 1: Insert/Update Employees without manager FK)
     for emp_info in employees_data:
-        emp_dict = {k: v for k, v in emp_info.items() if k != "initial_balances"}
+        emp_dict = {k: v for k, v in emp_info.items() if k not in ["initial_balances", "manager_id"]}
         emp = db.query(Employee).filter(Employee.employee_id == emp_dict["employee_id"]).first()
         if not emp:
             emp = Employee(**emp_dict)
             db.add(emp)
             db.flush()
+        else:
+            emp.name = emp_dict.get("name", emp.name)
+            emp.email = emp_dict.get("email", emp.email)
+            emp.department = emp_dict.get("department", emp.department)
+            emp.designation = emp_dict.get("designation", emp.designation)
+            emp.grade = emp_dict.get("grade", emp.grade)
+            emp.role = emp_dict.get("role", "EMPLOYEE")
+            emp.password = emp_dict.get("password", "password123")
+            emp.location_id = emp_dict.get("location_id", emp.location_id)
+            emp.status = "ACTIVE"
+
+    db.flush()
+
+    # Pass 2: Set manager_id hierarchy now that all employees exist
+    for emp_info in employees_data:
+        emp = db.query(Employee).filter(Employee.employee_id == emp_info["employee_id"]).first()
+        if emp:
+            emp.manager_id = emp_info.get("manager_id")
 
         # Seed initial balances
         for lt_id, opening in emp_info["initial_balances"].items():

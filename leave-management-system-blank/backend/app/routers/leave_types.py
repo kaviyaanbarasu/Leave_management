@@ -87,3 +87,16 @@ def update_leave_type(leave_type_id: str, payload: LeaveTypeUpdate, db: Session 
     db.commit()
     db.refresh(leave_type)
     return leave_type
+
+
+@router.delete("/{leave_type_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_leave_type(leave_type_id: str, db: Session = Depends(get_db)):
+    leave_type = db.query(LeaveType).filter(LeaveType.leave_type_id == leave_type_id).first()
+    if not leave_type:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Leave type '{leave_type_id}' not found",
+        )
+    db.delete(leave_type)
+    db.commit()
+    return None

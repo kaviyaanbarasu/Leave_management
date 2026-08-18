@@ -70,3 +70,16 @@ def update_location(location_id: str, payload: LocationUpdate, db: Session = Dep
     db.commit()
     db.refresh(location)
     return location
+
+
+@router.delete("/{location_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_location(location_id: str, db: Session = Depends(get_db)):
+    location = db.query(Location).filter(Location.location_id == location_id).first()
+    if not location:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Location '{location_id}' not found",
+        )
+    db.delete(location)
+    db.commit()
+    return None

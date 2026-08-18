@@ -15,12 +15,16 @@ class LeaveRequest(Base):
     total_calendar_days = Column(Integer, nullable=False)
     working_days = Column(Float, nullable=False)
     reason = Column(String(255), nullable=False)
-    status = Column(String(50), nullable=False, default="PENDING", index=True)  # PENDING, CANCELLED, APPROVED, REJECTED
+    status = Column(String(50), nullable=False, default="PENDING", index=True)  # PENDING_MANAGER, PENDING_HR, APPROVED, REJECTED, CANCELLED
+    current_tier = Column(Integer, nullable=False, default=1)
+    current_approver_id = Column(String(50), ForeignKey("employees.employee_id"), nullable=True)
     applied_on = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     # Relationships
-    employee = relationship("Employee", back_populates="leave_requests")
+    employee = relationship("Employee", foreign_keys=[employee_id], back_populates="leave_requests")
+    current_approver = relationship("Employee", foreign_keys=[current_approver_id])
     leave_type = relationship("LeaveType", back_populates="leave_requests")
+    approvals = relationship("LeaveApproval", back_populates="leave_request", cascade="all, delete-orphan", order_by="LeaveApproval.tier_level")
 
 
 class EmployeeLeaveBalance(Base):

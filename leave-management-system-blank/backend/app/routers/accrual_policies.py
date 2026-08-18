@@ -118,3 +118,16 @@ def run_accrual(payload: Optional[AccrualRunRequest] = None, db: Session = Depen
     year = payload.year if payload else None
     month = payload.month if payload else None
     return accrual_service.run_monthly_accrual(year=year, month=month, db=db)
+
+
+@router.delete("/accrual-policies/{policy_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_accrual_policy(policy_id: int, db: Session = Depends(get_db)):
+    policy = db.query(AccrualPolicy).filter(AccrualPolicy.policy_id == policy_id).first()
+    if not policy:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Accrual policy '{policy_id}' not found",
+        )
+    db.delete(policy)
+    db.commit()
+    return None

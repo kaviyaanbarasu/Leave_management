@@ -1,21 +1,69 @@
 import uuid
 from datetime import datetime, timezone
+from typing import List, Optional
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from app.models.employee import Employee
 from app.models.leave_type import LeaveType
 from app.models.leave_request import LeaveRequest
+from app.models.approval import LeaveApproval
 from app.schemas.leave_request import (
     LeaveRequestCreate,
     LeaveRequestResponse,
     LeaveCalculationPreviewRequest,
     LeaveCalculationPreviewResponse,
 )
+from app.schemas.approval import LeaveApprovalResponse
 from app.services.holiday_service import holiday_service
 from app.services.balance_service import balance_service
+from app.services.approval_service import approval_service
 
 
 class LeaveService:
+    def format_leave_response(self, leave_request: LeaveRequest, db: Session, reserved_days: Optional[float] = None, remaining_balance: Optional[float] = None) -> LeaveRequestResponse:
+        approver = db.query(Employee).filter(Employee.employee_id == leave_request.current_approver_id).first() if leave_request.current_approver_id else None
+        employee = leave_request.employee or db.query(Employee).filter(Employee.employee_id == leave_request.employee_id).first()
+
+        approvals_list = []
+        for app in leave_request.approvals:
+            app_emp = app.approver or db.query(Employee).filter(Employee.employee_id == app.approver_id).first()
+            approvals_list.append(
+                LeaveApprovalResponse(
+                    approval_id=app.approval_id,
+                    request_id=app.request_id,
+                    tier_level=app.tier_level,
+                    tier_name=app.tier_name,
+                    approver_id=app.approver_id,
+                    approver_name=app_emp.name if app_emp else app.approver_id,
+                    status=app.status,
+                    decision_at=app.decision_at,
+                    comments=app.comments,
+                )
+            )
+
+        if remaining_balance is None:
+            remaining_balance = balance_service.get_available_balance(leave_request.employee_id, leave_request.leave_type_id, db)
+
+        return LeaveRequestResponse(
+            request_id=leave_request.request_id,
+            employee_id=leave_request.employee_id,
+            employee_name=employee.name if employee else leave_request.employee_id,
+            leave_type_id=leave_request.leave_type_id,
+            start_date=leave_request.start_date,
+            end_date=leave_request.end_date,
+            total_calendar_days=leave_request.total_calendar_days,
+            working_days=leave_request.working_days,
+            reason=leave_request.reason,
+            status=leave_request.status,
+            current_tier=leave_request.current_tier,
+            current_approver_id=leave_request.current_approver_id,
+            current_approver_name=approver.name if approver else None,
+            applied_on=leave_request.applied_on,
+            reserved_days=reserved_days if reserved_days is not None else (leave_request.working_days if leave_request.status.startswith("PENDING") else 0.0),
+            remaining_available_balance=remaining_balance,
+            approvals=approvals_list,
+        )
+
     def preview_leave(
         self, payload: LeaveCalculationPreviewRequest, db: Session
     ) -> LeaveCalculationPreviewResponse:
@@ -165,7 +213,7 @@ class LeaveService:
             db.query(LeaveRequest)
             .filter(
                 LeaveRequest.employee_id == employee.employee_id,
-                LeaveRequest.status.in_(["PENDING", "APPROVED"]),
+                LeaveRequest.status.in_(["PENDING", "PENDING_MANAGER", "PENDING_HR", "APPROVED"]),
                 LeaveRequest.start_date <= payload.end_date,
                 LeaveRequest.end_date >= payload.start_date,
             )
@@ -186,7 +234,7 @@ class LeaveService:
                 detail=str(e),
             )
 
-        # 9. Create LeaveRequest record with status PENDING
+        # 9. Create LeaveRequest record
         request_id = f"REQ-{uuid.uuid4().hex[:8].upper()}"
         leave_request = LeaveRequest(
             request_id=request_id,
@@ -202,26 +250,18 @@ class LeaveService:
         )
 
         db.add(leave_request)
+        db.flush()
+
+        # 10. Create Multi-Tier Approval Chain & Send Notification
+        approval_service.create_approval_chain(leave_request, employee, db)
+
         db.commit()
         db.refresh(leave_request)
 
         # Get updated balance
         remaining_balance = balance_service.get_available_balance(employee.employee_id, leave_type.leave_type_id, db)
 
-        return LeaveRequestResponse(
-            request_id=leave_request.request_id,
-            employee_id=leave_request.employee_id,
-            leave_type_id=leave_request.leave_type_id,
-            start_date=leave_request.start_date,
-            end_date=leave_request.end_date,
-            total_calendar_days=leave_request.total_calendar_days,
-            working_days=leave_request.working_days,
-            reason=leave_request.reason,
-            status=leave_request.status,
-            applied_on=leave_request.applied_on,
-            reserved_days=working_days,
-            remaining_available_balance=remaining_balance,
-        )
+        return self.format_leave_response(leave_request, db, reserved_days=working_days, remaining_balance=remaining_balance)
 
     def cancel_leave_request(self, request_id: str, db: Session) -> LeaveRequestResponse:
         leave_request = db.query(LeaveRequest).filter(LeaveRequest.request_id == request_id).first()
@@ -231,39 +271,75 @@ class LeaveService:
                 detail=f"Leave request '{request_id}' not found",
             )
 
-        if leave_request.status != "PENDING":
+        if not leave_request.status.startswith("PENDING"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Cannot cancel leave request in '{leave_request.status}' status. Only PENDING requests can be cancelled.",
+                detail=f"Cannot cancel leave request in '{leave_request.status}' status. Only pending requests can be cancelled.",
             )
 
         # Release the pending balance reservation
-        balance_service.release_reservation(
+        balance_service.release_balance(
             leave_request.employee_id, leave_request.leave_type_id, leave_request.working_days, db
         )
 
+        # Mark all pending approvals as CANCELLED
+        db.query(LeaveApproval).filter(
+            LeaveApproval.request_id == request_id,
+            LeaveApproval.status == "PENDING",
+        ).update({"status": "CANCELLED", "decision_at": datetime.now(timezone.utc)})
+
         leave_request.status = "CANCELLED"
+        leave_request.current_approver_id = None
         db.commit()
         db.refresh(leave_request)
 
-        remaining_balance = balance_service.get_available_balance(
-            leave_request.employee_id, leave_request.leave_type_id, db
-        )
+        return self.format_leave_response(leave_request, db, reserved_days=0.0)
 
-        return LeaveRequestResponse(
-            request_id=leave_request.request_id,
-            employee_id=leave_request.employee_id,
-            leave_type_id=leave_request.leave_type_id,
-            start_date=leave_request.start_date,
-            end_date=leave_request.end_date,
-            total_calendar_days=leave_request.total_calendar_days,
-            working_days=leave_request.working_days,
-            reason=leave_request.reason,
-            status=leave_request.status,
-            applied_on=leave_request.applied_on,
-            reserved_days=0.0,
-            remaining_available_balance=remaining_balance,
-        )
+    def approve_leave_request(self, request_id: str, db: Session, approver_id: Optional[str] = None, comments: Optional[str] = None) -> LeaveRequestResponse:
+        """Approves the current tier for the request."""
+        # Find default approver if not passed
+        leave_request = db.query(LeaveRequest).filter(LeaveRequest.request_id == request_id).first()
+        if not leave_request:
+            raise HTTPException(status_code=404, detail=f"Request {request_id} not found")
+
+        active_approver_id = approver_id or leave_request.current_approver_id
+        if not active_approver_id:
+            hr_admin = db.query(Employee).filter(Employee.role == "HR_ADMIN").first()
+            active_approver_id = hr_admin.employee_id if hr_admin else "ADMIN01"
+
+        updated = approval_service.approve_tier(request_id, active_approver_id, comments, db)
+        return self.format_leave_response(updated, db)
+
+    def reject_leave_request(self, request_id: str, db: Session, approver_id: Optional[str] = None, comments: Optional[str] = "Rejected") -> LeaveRequestResponse:
+        """Rejects the request at the current tier and releases balance."""
+        leave_request = db.query(LeaveRequest).filter(LeaveRequest.request_id == request_id).first()
+        if not leave_request:
+            raise HTTPException(status_code=404, detail=f"Request {request_id} not found")
+
+        active_approver_id = approver_id or leave_request.current_approver_id
+        if not active_approver_id:
+            hr_admin = db.query(Employee).filter(Employee.role == "HR_ADMIN").first()
+            active_approver_id = hr_admin.employee_id if hr_admin else "ADMIN01"
+
+        updated = approval_service.reject_tier(request_id, active_approver_id, comments or "Rejected", db)
+        return self.format_leave_response(updated, db)
+
+    def delete_leave_request(self, request_id: str, db: Session):
+        leave_request = db.query(LeaveRequest).filter(LeaveRequest.request_id == request_id).first()
+        if not leave_request:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Leave request '{request_id}' not found",
+            )
+
+        if leave_request.status.startswith("PENDING"):
+            balance_service.release_balance(
+                leave_request.employee_id, leave_request.leave_type_id, leave_request.working_days, db
+            )
+
+        db.delete(leave_request)
+        db.commit()
+        return None
 
 
 leave_service = LeaveService()
