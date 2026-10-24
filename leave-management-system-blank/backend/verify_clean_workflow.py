@@ -4,6 +4,11 @@ from app.services.notification_service import notification_service
 BASE_URL = "http://127.0.0.1:8000/api"
 
 def test_clean_workflow():
+    """Verify clean user-driven leave workflow.
+
+    Raises:
+        AssertionError: If any of the verification steps fail, such as unexpected existing requests, pending approvals, or request creation errors.
+    """
     print("==================================================")
     print("  VERIFYING CLEAN USER-DRIVEN LEAVE FLOW")
     print("==================================================")

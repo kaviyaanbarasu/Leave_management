@@ -4,6 +4,20 @@ import json
 BASE_URL = "http://127.0.0.1:8000/api"
 
 def make_req(endpoint, data=None, method="GET"):
+    """Send an HTTP request to the given endpoint and return the JSON-decoded response.
+
+    Args:
+        endpoint (str): Path appended to BASE_URL for the request.
+        data (dict, optional): Payload to be JSON‑encoded and sent as the request body. Defaults to None.
+        method (str, optional): HTTP method to use (e.g., "GET", "POST"). Defaults to "GET".
+
+    Returns:
+        object: The parsed JSON content returned by the server.
+
+    Raises:
+        urllib.error.URLError: If the request cannot be completed.
+        json.JSONDecodeError: If the response cannot be decoded as JSON.
+    """
     url = f"{BASE_URL}{endpoint}"
     body = json.dumps(data).encode("utf-8") if data else None
     headers = {"Content-Type": "application/json"} if data else {}
@@ -12,6 +26,13 @@ def make_req(endpoint, data=None, method="GET"):
         return json.loads(resp.read().decode("utf-8"))
 
 def verify_scoping():
+    """Execute a sequence of authentication and authorization checks to verify scoping behavior.
+
+    Raises:
+        AssertionError: If any of the verification assertions fail.
+        urllib.error.URLError: Propagated from make_req when a request fails.
+        json.JSONDecodeError: Propagated from make_req when response JSON cannot be parsed.
+    """
     print("=== 1. TEST LOGIN VIJESH (INDIA / BLR) ===")
     res_vijesh = make_req("/auth/login", {"username": "E101", "password": "password123"}, "POST")
     user = res_vijesh["user"]

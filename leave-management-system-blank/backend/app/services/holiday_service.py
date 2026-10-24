@@ -57,12 +57,35 @@ GOOGLE_CALENDAR_NAMES = {
 class HolidayProvider:
     """Base Holiday Provider Interface"""
     def get_holidays(self, location_id: str, year: int, db: Session) -> List[Holiday]:
+        """Retrieve holidays for a location and year using the provided database session.
+
+        Args:
+            location_id (str): Identifier of the location.
+            year (int): Year for which holidays are requested.
+            db (Session): SQLAlchemy session used to query the database.
+
+        Returns:
+            List[Holiday]: List of Holiday objects matching the criteria.
+
+        Raises:
+            NotImplementedError: Always raised because the method is abstract.
+        """
         raise NotImplementedError
 
 
 class DatabaseHolidayProvider(HolidayProvider):
     """Database-backed Operational Holiday Provider"""
     def get_holidays(self, location_id: str, year: int, db: Session) -> List[Holiday]:
+        """Retrieve holidays for a location and year from the database.
+
+        Args:
+            location_id (str): Identifier of the location.
+            year (int): Year for which holidays are requested.
+            db (Session): SQLAlchemy session used to query the Holiday table.
+
+        Returns:
+            List[Holiday]: Ordered list of Holiday objects occurring between January 1 and December 31 of the specified year.
+        """
         start_of_year = date(year, 1, 1)
         end_of_year = date(year, 12, 31)
         return (
@@ -82,6 +105,15 @@ class GoogleCalendarHolidayProvider:
 
     @staticmethod
     def get_calendar_id_for_location(location: Location, fallback: bool = False) -> str:
+        """Determine the Google Calendar ID for a given location, optionally using fallback mappings.
+
+        Args:
+            location (Location): Location object containing identifier, country, and city.
+            fallback (bool, optional): If True, use the fallback mapping; otherwise use the primary mapping. Defaults to False.
+
+        Returns:
+            str: The calendar ID string derived from the appropriate mapping or a generated default.
+        """
         mapping = GOOGLE_CALENDAR_FALLBACK_MAP if fallback else GOOGLE_CALENDAR_MAP
         loc_id = location.location_id.upper()
         if loc_id in mapping:
@@ -101,6 +133,14 @@ class GoogleCalendarHolidayProvider:
 
     @staticmethod
     def get_calendar_name_for_location(location: Location) -> str:
+        """Get the human‑readable Google Calendar name for a location.
+
+        Args:
+            location (Location): Location object containing identifier and country.
+
+        Returns:
+            str: The calendar name from the predefined names map or a generic "<country> Public Holidays" string.
+        """
         loc_id = location.location_id.upper()
         if loc_id in GOOGLE_CALENDAR_NAMES:
             return GOOGLE_CALENDAR_NAMES[loc_id]
@@ -198,7 +238,13 @@ class GoogleCalendarHolidayProvider:
 
 
 class HolidayService:
+    """Service that coordinates holiday retrieval and synchronization using a HolidayProvider."""
     def __init__(self, provider: Optional[HolidayProvider] = None):
+        """Initialize the HolidayService with an optional HolidayProvider.
+
+        Args:
+            provider (Optional[HolidayProvider], optional): Custom provider to use; defaults to DatabaseHolidayProvider if None.
+        """
         self.provider = provider or DatabaseHolidayProvider()
 
     def get_sync_status(self, location_id: str, year: int, db: Session) -> Dict[str, Any]:
@@ -526,6 +572,16 @@ class HolidayService:
         return holiday is not None
 
     def get_holiday_details(self, location_id: str, check_date: date, db: Session) -> Optional[Holiday]:
+        """Retrieve the holiday record for a specific location and date.
+
+        Args:
+            location_id (str): Identifier of the location.
+            check_date (date): Date to look up.
+            db (Session): SQLAlchemy session for the query.
+
+        Returns:
+            Optional[Holiday]: The Holiday object matching the criteria, or None if no record exists.
+        """
         return (
             db.query(Holiday)
             .filter(Holiday.location_id == location_id, Holiday.date == check_date)

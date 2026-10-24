@@ -20,7 +20,19 @@ from app.services.approval_service import approval_service
 
 
 class LeaveService:
+    """Service class that provides methods for handling leave requests and related operations."""
     def format_leave_response(self, leave_request: LeaveRequest, db: Session, reserved_days: Optional[float] = None, remaining_balance: Optional[float] = None) -> LeaveRequestResponse:
+        """Format a leave request into a LeaveRequestResponse.
+
+        Args:
+            leave_request (LeaveRequest): The leave request to format.
+            db (Session): Database session for querying related data.
+            reserved_days (Optional[float]): Optional number of days reserved; if None, defaults based on request status.
+            remaining_balance (Optional[float]): Optional remaining leave balance; if None, fetched from balance_service.
+
+        Returns:
+            LeaveRequestResponse: The formatted leave request response.
+        """
         approver = db.query(Employee).filter(Employee.employee_id == leave_request.current_approver_id).first() if leave_request.current_approver_id else None
         employee = leave_request.employee or db.query(Employee).filter(Employee.employee_id == leave_request.employee_id).first()
 
@@ -67,6 +79,15 @@ class LeaveService:
     def preview_leave(
         self, payload: LeaveCalculationPreviewRequest, db: Session
     ) -> LeaveCalculationPreviewResponse:
+        """Generate a preview of leave calculation based on the supplied payload.
+
+        Args:
+            payload (LeaveCalculationPreviewRequest): The request containing employee, leave type, and date range.
+            db (Session): Database session for querying employee and leave type.
+
+        Returns:
+            LeaveCalculationPreviewResponse: The preview result, including validity flag and messages.
+        """
         employee = db.query(Employee).filter(Employee.employee_id == payload.employee_id).first()
         if not employee:
             return LeaveCalculationPreviewResponse(
@@ -161,6 +182,24 @@ class LeaveService:
         self, payload: LeaveRequestCreate, db: Session
     ) -> LeaveRequestResponse:
         # 1. Find employee
+        """Create a new leave request from the given payload.
+
+        Args:
+            payload (LeaveRequestCreate): Data required to create a leave request.
+            db (Session): Database session for accessing employee, leave type and persisting the request.
+
+        Returns:
+            LeaveRequestResponse: The created leave request formatted for response.
+
+        Raises:
+            HTTPException: If the employee does not exist.
+            HTTPException: If the leave type does not exist.
+            HTTPException: If the leave type does not belong to the employee's location.
+            HTTPException: If the start date is after the end date.
+            HTTPException: If calculating working days fails.
+            HTTPException: If the selected date range contains no working days.
+            HTTPException: If there is an overlapping active or pending leave request.
+        """
         employee = db.query(Employee).filter(Employee.employee_id == payload.employee_id).first()
         if not employee:
             raise HTTPException(
@@ -264,6 +303,19 @@ class LeaveService:
         return self.format_leave_response(leave_request, db, reserved_days=working_days, remaining_balance=remaining_balance)
 
     def cancel_leave_request(self, request_id: str, db: Session) -> LeaveRequestResponse:
+        """Cancel a pending leave request.
+
+        Args:
+            request_id (str): Identifier of the leave request to cancel.
+            db (Session): Database session for accessing and updating the leave request.
+
+        Returns:
+            LeaveRequestResponse: The cancelled leave request formatted for response.
+
+        Raises:
+            HTTPException: If the leave request does not exist.
+            HTTPException: If the leave request is not in a pending status.
+        """
         leave_request = db.query(LeaveRequest).filter(LeaveRequest.request_id == request_id).first()
         if not leave_request:
             raise HTTPException(
@@ -325,6 +377,18 @@ class LeaveService:
         return self.format_leave_response(updated, db)
 
     def delete_leave_request(self, request_id: str, db: Session):
+        """Delete a leave request.
+
+        Args:
+            request_id (str): Identifier of the leave request to delete.
+            db (Session): Database session for accessing and removing the leave request.
+
+        Returns:
+            None
+
+        Raises:
+            HTTPException: If the leave request does not exist.
+        """
         leave_request = db.query(LeaveRequest).filter(LeaveRequest.request_id == request_id).first()
         if not leave_request:
             raise HTTPException(

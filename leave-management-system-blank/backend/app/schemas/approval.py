@@ -4,6 +4,7 @@ from typing import Optional, List
 
 
 class LeaveApprovalResponse(BaseModel):
+    """Represent a leave approval response containing approval details."""
     approval_id: int
     id: Optional[int] = None
     request_id: str
@@ -24,14 +25,17 @@ class LeaveApprovalResponse(BaseModel):
 
 
 class ApproveTierRequest(BaseModel):
+    """Create a request to approve a tier with optional comments."""
     comments: Optional[str] = "Approved"
 
 
 class RejectTierRequest(BaseModel):
+    """Create a request to reject a tier with a required comment."""
     comments: str = Field(..., min_length=1, description="Reason for rejection is required")
 
 
 class PendingApprovalItem(BaseModel):
+    """Represent an item pending approval with detailed leave request and employee information."""
     approval_id: Optional[int] = None
     approvalId: Optional[int] = None
     request_id: str
@@ -65,6 +69,7 @@ class PendingApprovalItem(BaseModel):
 
 
 class ApprovalDecisionResponse(BaseModel):
+    """Represent the response after an approval decision, including status messages."""
     message: str
     approvalStatus: str
     nextApprover: Optional[str] = None

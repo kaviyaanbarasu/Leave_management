@@ -4,6 +4,7 @@ from app.database import Base
 
 
 class LeaveType(Base):
+    """Represent a type of leave with its properties and relationships."""
     __tablename__ = "leave_types"
 
     leave_type_id = Column(String(50), primary_key=True, index=True)

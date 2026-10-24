@@ -20,6 +20,20 @@ router = APIRouter(tags=["Accrual Policies"])
 @router.post("/accrual-policies", response_model=AccrualPolicyResponse, status_code=status.HTTP_201_CREATED)
 def create_accrual_policy(payload: AccrualPolicyCreate, db: Session = Depends(get_db)):
     # Verify location exists
+    """Create a new accrual policy from the provided payload.
+
+    Args:
+        payload: AccrualPolicyCreate object containing policy details.
+        db: Database session dependency.
+
+    Returns:
+        The newly created AccrualPolicy instance.
+
+    Raises:
+        HTTPException: If the specified location does not exist (404).
+        HTTPException: If the specified leave type does not exist (404).
+        HTTPException: If the leave type does not belong to the location (400).
+    """
     location = db.query(Location).filter(Location.location_id == payload.location_id).first()
     if not location:
         raise HTTPException(
@@ -63,6 +77,16 @@ def list_accrual_policies(
     leave_type_id: Optional[str] = Query(None, description="Filter by Leave Type ID"),
     db: Session = Depends(get_db),
 ):
+    """List accrual policies, optionally filtered by location and leave type.
+
+    Args:
+        location_id: Optional location identifier to filter policies.
+        leave_type_id: Optional leave type identifier to filter policies.
+        db: Database session dependency.
+
+    Returns:
+        A list of AccrualPolicy objects matching the filters.
+    """
     query = db.query(AccrualPolicy)
     if location_id:
         query = query.filter(AccrualPolicy.location_id == location_id)
@@ -73,6 +97,18 @@ def list_accrual_policies(
 
 @router.get("/accrual-policies/{policy_id}", response_model=AccrualPolicyResponse)
 def get_accrual_policy(policy_id: int, db: Session = Depends(get_db)):
+    """Retrieve an accrual policy by its ID.
+
+    Args:
+        policy_id: Identifier of the accrual policy to retrieve.
+        db: Database session dependency.
+
+    Returns:
+        The matching AccrualPolicy instance.
+
+    Raises:
+        HTTPException: If no policy with the given ID exists (404).
+    """
     policy = db.query(AccrualPolicy).filter(AccrualPolicy.policy_id == policy_id).first()
     if not policy:
         raise HTTPException(
@@ -84,6 +120,19 @@ def get_accrual_policy(policy_id: int, db: Session = Depends(get_db)):
 
 @router.put("/accrual-policies/{policy_id}", response_model=AccrualPolicyResponse)
 def update_accrual_policy(policy_id: int, payload: AccrualPolicyUpdate, db: Session = Depends(get_db)):
+    """Update an existing accrual policy with the supplied fields.
+
+    Args:
+        policy_id: Identifier of the policy to update.
+        payload: AccrualPolicyUpdate object containing fields to modify.
+        db: Database session dependency.
+
+    Returns:
+        The updated AccrualPolicy instance.
+
+    Raises:
+        HTTPException: If the policy to update does not exist (404).
+    """
     policy = db.query(AccrualPolicy).filter(AccrualPolicy.policy_id == policy_id).first()
     if not policy:
         raise HTTPException(
@@ -122,6 +171,18 @@ def run_accrual(payload: Optional[AccrualRunRequest] = None, db: Session = Depen
 
 @router.delete("/accrual-policies/{policy_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_accrual_policy(policy_id: int, db: Session = Depends(get_db)):
+    """Delete an accrual policy by its ID.
+
+    Args:
+        policy_id: Identifier of the policy to delete.
+        db: Database session dependency.
+
+    Returns:
+        None.
+
+    Raises:
+        HTTPException: If the policy to delete does not exist (404).
+    """
     policy = db.query(AccrualPolicy).filter(AccrualPolicy.policy_id == policy_id).first()
     if not policy:
         raise HTTPException(

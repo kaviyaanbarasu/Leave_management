@@ -4,6 +4,7 @@ from app.database import Base
 
 
 class Employee(Base):
+    """Represent an employee record with personal and employment details."""
     __tablename__ = "employees"
 
     employee_id = Column(String(50), primary_key=True, index=True)
@@ -28,12 +29,27 @@ class Employee(Base):
 
     @property
     def manager_name(self):
+        """Return the manager's name if a manager is assigned, otherwise None.
+
+        Returns:
+            str or None: The manager's name or None if no manager is assigned.
+        """
         return self.manager.name if self.manager else None
 
     @property
     def location_name(self):
+        """Return the location's name if the employee has an associated location, otherwise return the location identifier.
+
+        Returns:
+            str: The location name or the location_id when the location object is not available.
+        """
         return self.location.name if self.location else self.location_id
 
     @property
     def country(self):
+        """Return the country of the employee's location if available, otherwise None.
+
+        Returns:
+            str or None: The country name or None if the location is not associated.
+        """
         return self.location.country if self.location else None

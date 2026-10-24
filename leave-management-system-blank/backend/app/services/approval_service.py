@@ -16,6 +16,7 @@ from app.services.notification_service import notification_service
 
 
 class ApprovalService:
+    """Provide functionality to build hierarchical approval chains for leave requests."""
     def create_approval_chain(
         self, leave_request: LeaveRequest, employee: Employee, db: Session
     ):

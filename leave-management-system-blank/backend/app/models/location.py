@@ -4,6 +4,7 @@ from app.database import Base
 
 
 class Location(Base):
+    """Represent a physical location with its details and related entities."""
     __tablename__ = "locations"
 
     location_id = Column(String(50), primary_key=True, index=True)

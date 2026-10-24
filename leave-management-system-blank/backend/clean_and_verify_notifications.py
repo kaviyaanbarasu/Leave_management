@@ -15,6 +15,14 @@ from app.services.email_service import email_service
 
 
 def clean_and_verify():
+    """Clean and verify the notification system and employee data.
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If any of the required employees (E101, M201, ADMIN01) are missing or have incorrect manager relationships.
+    """
     print("=================================================================")
     print("     CLEAN & VERIFY: GMAIL SMTP + SEQUENTIAL APPROVAL OUTBOX     ")
     print("=================================================================")

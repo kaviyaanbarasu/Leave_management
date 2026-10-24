@@ -14,6 +14,20 @@ router = APIRouter(prefix="/employees", tags=["Employees"])
 @router.post("", response_model=EmployeeResponse, status_code=status.HTTP_201_CREATED)
 def create_employee(payload: EmployeeCreate, db: Session = Depends(get_db)):
     # Verify unique employee_id
+    """Create a new employee.
+
+    Args:
+    payload: EmployeeCreate object containing employee details.
+    db: Session database session (dependency).
+
+    Returns:
+    The newly created Employee instance.
+
+    Raises:
+    HTTPException: If an employee with the same employee_id already exists (409 Conflict).
+    HTTPException: If an employee with the same email already exists (409 Conflict).
+    HTTPException: If the referenced location does not exist (404 Not Found).
+    """
     existing_id = db.query(Employee).filter(Employee.employee_id == payload.employee_id).first()
     if existing_id:
         raise HTTPException(
@@ -64,11 +78,31 @@ def create_employee(payload: EmployeeCreate, db: Session = Depends(get_db)):
 
 @router.get("", response_model=List[EmployeeResponse])
 def list_employees(db: Session = Depends(get_db)):
+    """List all employees.
+
+    Args:
+    db: Session database session (dependency).
+
+    Returns:
+    A list of Employee instances ordered by employee_id.
+    """
     return db.query(Employee).order_by(Employee.employee_id).all()
 
 
 @router.get("/{employee_id}", response_model=EmployeeResponse)
 def get_employee(employee_id: str, db: Session = Depends(get_db)):
+    """Retrieve an employee by ID.
+
+    Args:
+    employee_id: The unique identifier of the employee to retrieve.
+    db: Session database session (dependency).
+
+    Returns:
+    The Employee instance matching the given employee_id.
+
+    Raises:
+    HTTPException: If no employee with the given ID is found (404 Not Found).
+    """
     employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if not employee:
         raise HTTPException(
@@ -80,6 +114,21 @@ def get_employee(employee_id: str, db: Session = Depends(get_db)):
 
 @router.put("/{employee_id}", response_model=EmployeeResponse)
 def update_employee(employee_id: str, payload: EmployeeUpdate, db: Session = Depends(get_db)):
+    """Update an existing employee.
+
+    Args:
+    employee_id: The unique identifier of the employee to update.
+    payload: EmployeeUpdate object with fields to modify.
+    db: Session database session (dependency).
+
+    Returns:
+    The updated Employee instance.
+
+    Raises:
+    HTTPException: If the employee does not exist (404 Not Found).
+    HTTPException: If the new email conflicts with another employee (409 Conflict).
+    HTTPException: If the new location does not exist (404 Not Found).
+    """
     employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if not employee:
         raise HTTPException(
@@ -133,6 +182,18 @@ def update_employee(employee_id: str, payload: EmployeeUpdate, db: Session = Dep
 
 @router.delete("/{employee_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_employee(employee_id: str, db: Session = Depends(get_db)):
+    """Delete an employee by ID.
+
+    Args:
+    employee_id: The unique identifier of the employee to delete.
+    db: Session database session (dependency).
+
+    Returns:
+    None.
+
+    Raises:
+    HTTPException: If the employee does not exist (404 Not Found).
+    """
     employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if not employee:
         raise HTTPException(
@@ -146,6 +207,18 @@ def delete_employee(employee_id: str, db: Session = Depends(get_db)):
 
 @router.get("/{employee_id}/balance", response_model=EmployeeBalanceResponse)
 def get_employee_balance(employee_id: str, db: Session = Depends(get_db)):
+    """Get leave balances for an employee.
+
+    Args:
+    employee_id: The unique identifier of the employee.
+    db: Session database session (dependency).
+
+    Returns:
+    The employee's leave balances as provided by the balance service.
+
+    Raises:
+    HTTPException: If the employee or balances are not found (404 Not Found).
+    """
     try:
         return balance_service.get_employee_balances(employee_id, db)
     except ValueError as e:
@@ -157,6 +230,19 @@ def get_employee_balance(employee_id: str, db: Session = Depends(get_db)):
 
 @router.post("/{employee_id}/adjust-balance", response_model=EmployeeBalanceResponse)
 def adjust_employee_balance(employee_id: str, payload: BalanceAdjustmentRequest, db: Session = Depends(get_db)):
+    """Adjust an employee's leave balance.
+
+    Args:
+    employee_id: The unique identifier of the employee.
+    payload: BalanceAdjustmentRequest containing leave_type_id and adjustment_days.
+    db: Session database session (dependency).
+
+    Returns:
+    The updated leave balances for the employee.
+
+    Raises:
+    HTTPException: If the employee does not exist (404 Not Found).
+    """
     employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if not employee:
         raise HTTPException(

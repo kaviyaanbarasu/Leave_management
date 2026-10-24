@@ -5,6 +5,7 @@ from app.database import Base
 
 
 class Holiday(Base):
+    """Define a holiday model representing a holiday record with location, name, date, type, description, source, and external event ID."""
     __tablename__ = "holidays"
 
     holiday_id = Column(Integer, primary_key=True, autoincrement=True, index=True)
@@ -21,6 +22,7 @@ class Holiday(Base):
 
 
 class HolidaySync(Base):
+    """Define a holiday sync model tracking synchronization status, calendar ID, last synced timestamp, holiday count, and error information for a specific location and year."""
     __tablename__ = "holiday_syncs"
 
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)

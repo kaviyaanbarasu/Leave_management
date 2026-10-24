@@ -5,6 +5,7 @@ from app.database import Base
 
 
 class Notification(Base):
+    """Represent a notification record for leave request events."""
     __tablename__ = "notifications"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)

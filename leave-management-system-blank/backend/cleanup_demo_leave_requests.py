@@ -4,6 +4,11 @@ from app.models.approval import LeaveApproval
 from app.services.notification_service import notification_service
 
 def cleanup_demo_requests():
+    """Clean up demo leave requests and reset employee leave balances.
+
+    Raises:
+        Exception: If an error occurs during cleanup.
+    """
     print("==================================================")
     print("  CLEANING DEMO LEAVE REQUESTS & RESETTING BALANCES")
     print("==================================================")

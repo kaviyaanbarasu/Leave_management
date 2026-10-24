@@ -3,6 +3,7 @@ from sqlalchemy import text
 from app.database import engine
 
 def migrate_v3():
+    """Run v3 migration for notifications table in PostgreSQL."""
     print("Running v3 migration for notifications table in PostgreSQL...")
     with engine.connect() as conn:
         # Add body_text if missing

@@ -5,6 +5,7 @@ from app.database import Base
 
 
 class AccrualPolicy(Base):
+    """Define an accrual policy for leave accrual calculations."""
     __tablename__ = "accrual_policies"
 
     policy_id = Column(Integer, primary_key=True, autoincrement=True, index=True)
@@ -23,6 +24,7 @@ class AccrualPolicy(Base):
 
 
 class AccrualRecord(Base):
+    """Record an employee's leave accrual for a specific month and year."""
     __tablename__ = "accrual_records"
 
     record_id = Column(Integer, primary_key=True, autoincrement=True, index=True)

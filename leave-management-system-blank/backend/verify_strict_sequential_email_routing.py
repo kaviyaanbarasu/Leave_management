@@ -3,6 +3,14 @@ import httpx
 BASE_URL = "http://127.0.0.1:8000/api"
 
 def test_all_sequential_workflows():
+    """Test strict sequential email routing and outbox accuracy for multi‑tier leave request approvals.
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If any HTTP request fails or expected outbox contents are not as expected.
+    """
     print("==================================================================")
     print("  TESTING STRICT SEQUENTIAL EMAIL ROUTING & OUTBOX ACCURACY")
     print("==================================================================")

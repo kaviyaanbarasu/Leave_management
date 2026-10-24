@@ -20,6 +20,14 @@ from app.routers import (
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize database tables
+    """Initialize database tables and seed demo data during application startup.
+
+    Args:
+        app (FastAPI): The FastAPI application instance.
+
+    Returns:
+        None
+    """
     Base.metadata.create_all(bind=engine)
     # Seed initial demo data
     db = next(get_db())
@@ -61,6 +69,11 @@ app.include_router(approvals_router, prefix="/api")
 
 @app.get("/", tags=["Health"])
 def root():
+    """Return a welcome message and useful endpoint URLs.
+
+    Returns:
+        dict: A dictionary containing a welcome message, documentation URL, and health check endpoint.
+    """
     return {
         "message": "Welcome to Dynamic PTO & Leave Management System API",
         "docs": "/docs",
@@ -70,6 +83,11 @@ def root():
 
 @app.get("/api/health", tags=["Health"])
 def health_check():
+    """Return health status information for the application.
+
+    Returns:
+        dict: A dictionary with status, project name, and version.
+    """
     return {
         "status": "healthy",
         "project": settings.PROJECT_NAME,
@@ -79,5 +97,13 @@ def health_check():
 
 @app.post("/api/seed", tags=["Admin"])
 def trigger_seed(db: Session = Depends(get_db)):
+    """Seed the database with demo data and return a confirmation message.
+
+    Args:
+        db (Session): Database session provided by dependency injection.
+
+    Returns:
+        dict: A dictionary with a success message indicating seeding completed.
+    """
     seed_database(db)
     return {"message": "Database successfully seeded with demo data"}

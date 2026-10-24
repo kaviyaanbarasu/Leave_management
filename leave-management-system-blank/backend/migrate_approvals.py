@@ -2,6 +2,7 @@ import psycopg2
 from app.config import settings
 
 def migrate():
+    """Migrate the PostgreSQL database schema to support multi-tier leave approvals."""
     conn = psycopg2.connect(settings.DATABASE_URL)
     cur = conn.cursor()
     try:

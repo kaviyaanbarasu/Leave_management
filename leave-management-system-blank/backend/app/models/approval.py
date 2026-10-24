@@ -5,6 +5,7 @@ from app.database import Base
 
 
 class LeaveApproval(Base):
+    """Represent a leave approval record in the database."""
     __tablename__ = "leave_approvals"
 
     approval_id = Column(Integer, primary_key=True, autoincrement=True, index=True)
@@ -29,16 +30,36 @@ class LeaveApproval(Base):
     # Compatibility Property Aliases
     @property
     def id(self) -> int:
+        """Return the approval identifier.
+
+        Returns:
+            int: The primary key of the approval.
+        """
         return self.approval_id
 
     @property
     def leave_request_id(self) -> str:
+        """Return the associated leave request identifier.
+
+        Returns:
+            str: The request ID linked to this approval.
+        """
         return self.request_id
 
     @property
     def approval_level(self) -> int:
+        """Return the tier level of the approval.
+
+        Returns:
+            int: The sequential tier level.
+        """
         return self.tier_level
 
     @property
     def actioned_at(self):
+        """Return the timestamp when the decision was made.
+
+        Returns:
+            datetime.datetime or None: The decision timestamp, or None if not decided.
+        """
         return self.decision_at

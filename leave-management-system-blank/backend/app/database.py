@@ -24,6 +24,15 @@ else:
 if settings.DATABASE_URL.startswith("sqlite"):
     @event.listens_for(Engine, "connect")
     def set_sqlite_pragma(dbapi_connection, connection_record):
+        """Enable foreign key support for SQLite connections.
+
+        Args:
+            dbapi_connection: DBAPI connection object.
+            connection_record: SQLAlchemy connection record (unused).
+
+        Returns:
+            None
+        """
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
@@ -34,6 +43,11 @@ Base = declarative_base()
 
 
 def get_db():
+    """Provide a database session and ensure it is closed after use.
+
+    Returns:
+        Generator yielding a SQLAlchemy Session instance.
+    """
     db = SessionLocal()
     try:
         yield db

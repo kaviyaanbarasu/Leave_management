@@ -10,6 +10,7 @@ from app.models import (
 )
 
 def run_migration():
+    """Run the database migration to create any newly declared tables and add missing columns to existing tables."""
     print("Creating any newly declared tables...")
     Base.metadata.create_all(bind=engine)
 

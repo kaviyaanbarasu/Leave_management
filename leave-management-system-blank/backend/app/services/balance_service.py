@@ -8,9 +8,21 @@ from app.schemas.leave_request import EmployeeBalanceResponse, BalanceItemRespon
 
 
 class BalanceService:
+    """Provide methods to manage and query employee leave balances."""
     def get_or_create_balance(
         self, employee_id: str, leave_type_id: str, db: Session, initial_opening: float = 0.0
     ) -> EmployeeLeaveBalance:
+        """Retrieve an existing employee leave balance or create a new one if none exists.
+
+        Args:
+        employee_id (str): Identifier of the employee.
+        leave_type_id (str): Identifier of the leave type.
+        db (Session): SQLAlchemy session used for database operations.
+        initial_opening (float, optional): Opening balance to set when creating a new record. Defaults to 0.0.
+
+        Returns:
+        EmployeeLeaveBalance: The existing or newly created balance record.
+        """
         balance = (
             db.query(EmployeeLeaveBalance)
             .filter(
@@ -35,6 +47,18 @@ class BalanceService:
         return balance
 
     def get_employee_balances(self, employee_id: str, db: Session) -> EmployeeBalanceResponse:
+        """Retrieve the leave balances for all active leave types applicable to an employee's location.
+
+        Args:
+        employee_id (str): Identifier of the employee.
+        db (Session): SQLAlchemy session for database queries.
+
+        Returns:
+        EmployeeBalanceResponse: Response object containing employee details and a list of balance items.
+
+        Raises:
+        ValueError: If the employee with the given ID does not exist.
+        """
         employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
         if not employee:
             raise ValueError(f"Employee {employee_id} not found")
@@ -84,6 +108,16 @@ class BalanceService:
         )
 
     def get_available_balance(self, employee_id: str, leave_type_id: str, db: Session) -> float:
+        """Return the available leave balance for a specific employee and leave type.
+
+        Args:
+        employee_id (str): Identifier of the employee.
+        leave_type_id (str): Identifier of the leave type.
+        db (Session): SQLAlchemy session.
+
+        Returns:
+        float: The available balance amount.
+        """
         balance = self.get_or_create_balance(employee_id, leave_type_id, db)
         return balance.available_balance
 
@@ -139,9 +173,31 @@ class BalanceService:
         db.flush()
 
     def release_balance(self, employee_id: str, leave_type_id: str, working_days: float, db: Session):
+        """Release a previously reserved amount of leave balance for an employee.
+
+        Args:
+        employee_id (str): Identifier of the employee.
+        leave_type_id (str): Identifier of the leave type.
+        working_days (float): Number of days to release from the reservation.
+        db (Session): SQLAlchemy session.
+
+        Returns:
+        Any: The result of the underlying release_reservation operation.
+        """
         return self.release_reservation(employee_id, leave_type_id, working_days, db)
 
     def deduct_balance(self, employee_id: str, leave_type_id: str, working_days: float, db: Session):
+        """Deduct (approve) a reserved amount of leave balance for an employee.
+
+        Args:
+        employee_id (str): Identifier of the employee.
+        leave_type_id (str): Identifier of the leave type.
+        working_days (float): Number of days to deduct from the reservation.
+        db (Session): SQLAlchemy session.
+
+        Returns:
+        Any: The result of the underlying approve_reservation operation.
+        """
         return self.approve_reservation(employee_id, leave_type_id, working_days, db)
 
     def adjust_balance(self, employee_id: str, leave_type_id: str, adjustment_days: float, db: Session) -> EmployeeLeaveBalance:

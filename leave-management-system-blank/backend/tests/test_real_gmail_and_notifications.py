@@ -14,6 +14,11 @@ from app.schemas.leave_request import LeaveRequestCreate
 
 @pytest.fixture
 def client():
+    """Create a TestClient for the FastAPI app.
+
+    Returns:
+        TestClient: A test client instance bound to the application.
+    """
     return TestClient(app)
 
 

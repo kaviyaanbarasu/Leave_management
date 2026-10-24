@@ -16,9 +16,15 @@ class EmailService:
     """
 
     def __init__(self):
+        """Initialize the EmailService instance."""
         pass
 
     def get_smtp_config(self) -> Dict[str, Any]:
+        """Retrieve SMTP configuration from environment variables.
+
+        Returns:
+            Dict[str, Any]: Configuration dictionary with keys host, port, username, password, from_email, and from_name.
+        """
         host = os.getenv("MAIL_HOST") or os.getenv("SMTP_HOST") or "smtp.gmail.com"
         port = int(os.getenv("MAIL_PORT") or os.getenv("SMTP_PORT") or 587)
         username = (
@@ -47,10 +53,20 @@ class EmailService:
         }
 
     def is_configured(self) -> bool:
+        """Check whether SMTP credentials are fully configured.
+
+        Returns:
+            bool: True if both username and a non‑empty password are set, otherwise False.
+        """
         cfg = self.get_smtp_config()
         return bool(cfg["username"] and cfg["password"] and cfg["password"].strip())
 
     def get_status(self) -> Dict[str, Any]:
+        """Provide a status summary of the SMTP configuration.
+
+        Returns:
+            Dict[str, Any]: Dictionary containing is_configured, smtp_host, smtp_port, smtp_user, from_email, from_name, and delivery_mode.
+        """
         cfg = self.get_smtp_config()
         configured = bool(cfg["username"] and cfg["password"] and cfg["password"].strip())
         return {

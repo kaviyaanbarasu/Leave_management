@@ -17,6 +17,7 @@ client = TestClient(app)
 # 1. Employee Creation & Retrieval Tests
 # ==========================================
 def test_create_and_get_employee():
+    """Create an employee via the API and verify its data, then retrieve the employee and confirm the email."""
     payload = {
         "employee_id": "E999",
         "name": "Test User",
@@ -42,6 +43,7 @@ def test_create_and_get_employee():
 
 
 def test_duplicate_employee_id_rejected():
+    """Attempt to create an employee with a duplicate ID and verify that the API returns a conflict."""
     payload = {
         "employee_id": "E101",  # Already seeded
         "name": "Duplicate User",
@@ -61,6 +63,7 @@ def test_duplicate_employee_id_rejected():
 # 2. Location Creation & Weekend Config
 # ==========================================
 def test_create_location():
+    """Create a location via the API and verify its identifier and weekend days."""
     payload = {
         "location_id": "LND",
         "name": "London Office",
@@ -80,6 +83,7 @@ def test_create_location():
 # ==========================================
 def test_location_specific_leave_types():
     # Fetch BLR leave types
+    """Retrieve leave types for specific locations and verify the presence or absence of certain types."""
     blr_res = client.get("/api/leave-types?location_id=BLR")
     assert blr_res.status_code == 200
     blr_types = [lt["name"] for lt in blr_res.json()]
@@ -100,6 +104,7 @@ def test_location_specific_leave_types():
 # 4. Holiday Detection
 # ==========================================
 def test_holiday_detection():
+    """Check if specific dates are recognized as holidays for a location using the holiday service."""
     db = TestingSessionLocal()
     # 2026-10-20 is Diwali in BLR
     is_diwali = holiday_service.is_holiday("BLR", date(2026, 10, 20), db)
@@ -115,6 +120,7 @@ def test_holiday_detection():
 # 5 & 8. Weekend Detection & Different Configs (BLR vs DXB)
 # ==========================================
 def test_weekend_detection_by_location():
+    """Determine weekend status for dates in different locations using the holiday service."""
     db = TestingSessionLocal()
     blr = db.query(Location).filter(Location.location_id == "BLR").first()
     dxb = db.query(Location).filter(Location.location_id == "DXB").first()
@@ -150,6 +156,7 @@ def test_diwali_and_working_day_calculation():
     # Oct 21 -> working
     # Oct 22 -> working
     # Total calendar days = 4, Working days = 3
+    """Preview a leave request spanning a holiday and verify calendar and working day calculations."""
     preview_res = client.post(
         "/api/leave-requests/preview",
         json={
@@ -170,6 +177,7 @@ def test_diwali_and_working_day_calculation():
 # 9. Accrual Calculation
 # ==========================================
 def test_accrual_policy_matching():
+    """Calculate the accrual policy and rate for an employee and leave type and ensure they match expected values."""
     db = TestingSessionLocal()
     e101 = db.query(Employee).filter(Employee.employee_id == "E101").first()  # G5 grade
     # PTO for G5 in BLR = 1.5 per month
@@ -185,6 +193,7 @@ def test_accrual_policy_matching():
 # 10. Maximum Balance Cap
 # ==========================================
 def test_max_balance_cap():
+    """Verify that the accrual operation respects the maximum balance cap for PTO."""
     db = TestingSessionLocal()
     # Set employee balance close to max (29.5 out of 30.0)
     bal = (
@@ -211,6 +220,7 @@ def test_max_balance_cap():
 # ==========================================
 def test_leave_balance_and_pending_reservation():
     # Initial balance for E101 BLR-PTO is 10.0
+    """Check that a leave request creates a pending reservation and updates available balance accordingly."""
     bal_res = client.get("/api/employees/E101/balance")
     pto_bal = next(b for b in bal_res.json()["balances"] if b["leave_type_id"] == "BLR-PTO")
     assert pto_bal["available"] == 10.0
@@ -246,6 +256,7 @@ def test_leave_balance_and_pending_reservation():
 # ==========================================
 def test_leave_cancellation_releases_balance():
     # Submit request for 3 working days
+    """Ensure that cancelling a leave request releases the pending reservation and restores the available balance."""
     req_res = client.post(
         "/api/leave-requests",
         json={
@@ -276,6 +287,7 @@ def test_leave_cancellation_releases_balance():
 # ==========================================
 def test_insufficient_balance_rejection():
     # E101 has 10 days PTO. Requesting 15 working days should fail with 409
+    """Confirm that a leave request exceeding available balance is rejected with an insufficient balance error."""
     res = client.post(
         "/api/leave-requests",
         json={
@@ -295,6 +307,7 @@ def test_insufficient_balance_rejection():
 # ==========================================
 def test_overlapping_request_rejection():
     # First request: Oct 19 to Oct 22
+    """Validate that overlapping leave requests are rejected with an overlapping request error."""
     client.post(
         "/api/leave-requests",
         json={
@@ -326,6 +339,7 @@ def test_overlapping_request_rejection():
 # ==========================================
 def test_invalid_leave_type_for_location_rejection():
     # E101 is in BLR. Trying to request SG-PTO should be rejected with 400
+    """Test that requesting a leave type not associated with the employee's location returns a validation error."""
     res = client.post(
         "/api/leave-requests",
         json={
@@ -345,6 +359,7 @@ def test_invalid_leave_type_for_location_rejection():
 # ==========================================
 def test_monthly_accrual_idempotency():
     # First run for August 2026
+    """Assert that running monthly accrual twice for the same period does not double credit and skips already accrued entries."""
     res1 = client.post("/api/accrual/run", json={"year": 2026, "month": 8})
     assert res1.status_code == 200
     data1 = res1.json()
@@ -365,6 +380,7 @@ def test_monthly_accrual_idempotency():
 # ==========================================
 def test_leave_approval_deducts_balance():
     # Submit request for 3 working days
+    """Verify that approving a leave request deducts the used days from the employee's balance and clears pending reservations."""
     req_res = client.post(
         "/api/leave-requests",
         json={
@@ -396,6 +412,7 @@ def test_leave_approval_deducts_balance():
 # ==========================================
 def test_leave_rejection_releases_balance():
     # Submit request
+    """Submit a leave request, reject it, and verify the pending balance is released."""
     req_res = client.post(
         "/api/leave-requests",
         json={
@@ -425,6 +442,7 @@ def test_leave_rejection_releases_balance():
 # ==========================================
 def test_adjust_employee_balance():
     # Add 5 days of PTO
+    """Adjust an employee's PTO balance and verify the adjusted amount reflects the addition."""
     adj_res = client.post(
         "/api/employees/E101/adjust-balance",
         json={
@@ -442,6 +460,7 @@ def test_adjust_employee_balance():
 # 22. Google Calendar Holiday Status
 # ==========================================
 def test_google_holiday_status():
+    """Retrieve Google holiday status and confirm supported locations include expected entries."""
     res = client.get("/api/holidays/google-status")
     assert res.status_code == 200
     data = res.json()
@@ -456,6 +475,10 @@ def test_google_holiday_status():
 # 23. Google Calendar Holiday Sync Mocked
 # ==========================================
 def test_google_holiday_sync_mock(monkeypatch):
+    """Mock Google Calendar fetch, sync holidays for a location, and verify the holidays are saved.
+    Args:
+        monkeypatch: pytest fixture used to replace the fetch_holidays method with a mock implementation.
+    """
     from app.services.holiday_service import GoogleCalendarHolidayProvider
     from datetime import date
 

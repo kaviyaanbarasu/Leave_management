@@ -10,6 +10,7 @@ load_dotenv(dotenv_path=env_path)
 
 
 class Settings(BaseSettings):
+    """Define application settings with defaults and environment variable overrides."""
     PROJECT_NAME: str = "Dynamic PTO & Leave Management System"
     API_V1_STR: str = "/api"
     DATABASE_URL: str = os.getenv(

@@ -5,6 +5,11 @@ from datetime import date, timedelta
 BASE_URL = "http://127.0.0.1:8000/api"
 
 def test_dynamic_postgres():
+    """Verify dynamic PostgreSQL employee creation, balance initialization, adjustment, and leave application workflow.
+
+    Raises:
+        AssertionError: If any verification step fails.
+    """
     print("\n=======================================================")
     print("  COMPREHENSIVE POSTGRESQL DYNAMIC SYSTEM VERIFICATION ")
     print("=======================================================\n")

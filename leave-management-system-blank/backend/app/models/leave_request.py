@@ -5,6 +5,7 @@ from app.database import Base
 
 
 class LeaveRequest(Base):
+    """Define a leave request model."""
     __tablename__ = "leave_requests"
 
     request_id = Column(String(50), primary_key=True, index=True)
@@ -28,6 +29,7 @@ class LeaveRequest(Base):
 
 
 class EmployeeLeaveBalance(Base):
+    """Define an employee leave balance model."""
     __tablename__ = "employee_leave_balances"
 
     balance_id = Column(Integer, primary_key=True, autoincrement=True, index=True)
@@ -50,4 +52,9 @@ class EmployeeLeaveBalance(Base):
 
     @property
     def available_balance(self) -> float:
+        """Calculate the available leave balance.
+
+        Returns:
+            float: The available balance rounded to two decimal places, never less than zero.
+        """
         return max(0.0, round(self.opening_balance + self.accrued + self.adjusted - self.used - self.pending, 2))

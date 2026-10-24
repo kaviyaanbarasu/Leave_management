@@ -11,6 +11,14 @@ from app.models.approval import LeaveApproval
 
 def seed_database(db: Session):
     # 1. Locations
+    """Seed the database with default locations and leave types.
+
+    Args:
+        db: SQLAlchemy Session used for database operations.
+
+    Returns:
+        None
+    """
     locations_data = [
         {
             "location_id": "BLR",

@@ -7,6 +7,11 @@ from app.models.approval import LeaveApproval
 from app.seed import seed_database
 
 def run_live_verification():
+    """Run the comprehensive PostgreSQL end-to-end verification, resetting test data, seeding the database, and asserting that employee personas and leave request workflow behave as expected.
+
+    Raises:
+        AssertionError: If any of the verification assertions fail, indicating a mismatch in expected data or workflow behavior.
+    """
     print("==================================================")
     print("Comprehensive PostgreSQL End-to-End Verification")
     print("Updated Personas: Vijesh (E101), Kaviya (M201), Ahallya Nethra (ADMIN01)")

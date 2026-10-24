@@ -4,6 +4,15 @@ from app.models.leave_request import LeaveRequest
 from app.models.notification import Notification
 
 def get_headers(employee_id: str, role: str = "employee") -> dict:
+    """Return HTTP headers containing authorization and employee ID.
+
+    Args:
+        employee_id (str): The identifier of the employee.
+        role (str, optional): The role of the employee. Defaults to "employee".
+
+    Returns:
+        dict: A dictionary with "Authorization" and "X-Employee-ID" entries.
+    """
     return {
         "Authorization": f"Bearer session-{employee_id}-{role}",
         "X-Employee-ID": employee_id,

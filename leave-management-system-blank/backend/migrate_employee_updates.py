@@ -5,6 +5,11 @@ from app.models.leave_request import LeaveRequest, EmployeeLeaveBalance
 from app.models.approval import LeaveApproval
 
 def sync_db():
+    """Synchronize the PostgreSQL database with updated employees and hierarchy.
+
+    Raises:
+        AssertionError: If any employee references a deleted manager, any leave approval references a deleted approver, or deleted employees still exist.
+    """
     db = SessionLocal()
     print("Syncing PostgreSQL Database with updated employees and hierarchy...")
     try:

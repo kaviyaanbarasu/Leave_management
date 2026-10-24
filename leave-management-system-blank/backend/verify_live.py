@@ -5,6 +5,12 @@ BASE_URL = "http://127.0.0.1:8000/api"
 VITE_URL = "http://localhost:3000/api"
 
 def test_live_system():
+    """Test the live dynamic PTO & leave management system endpoints.
+
+    Raises:
+        AssertionError: If any of the API checks fail.
+        httpx.HTTPError: If an HTTP request encounters an error.
+    """
     print("=== TESTING LIVE DYNAMIC PTO & LEAVE MANAGEMENT SYSTEM ===")
     
     with httpx.Client(timeout=10.0) as client:

@@ -108,6 +108,11 @@ def get_notification_outbox(
 
 
 class TestEmailRequest(BaseModel):
+    """Create a request model for sending a test email.
+
+    Args:
+        to_email (str): The email address of the recipient.
+    """
     to_email: str
 
 
@@ -198,6 +203,16 @@ def list_leave_requests(
     status_filter: Optional[str] = Query(None, alias="status", description="Filter by Status (e.g. PENDING, CANCELLED)"),
     db: Session = Depends(get_db),
 ):
+    """Retrieve a list of leave requests optionally filtered by employee ID and status.
+
+    Args:
+        employee_id (Optional[str]): Employee ID to filter the leave requests. Defaults to None.
+        status_filter (Optional[str]): Status to filter the leave requests (e.g. PENDING, CANCELLED). Defaults to None.
+        db (Session): Database session dependency.
+
+    Returns:
+        List[dict]: A list of formatted leave request representations.
+    """
     query = db.query(LeaveRequest)
     if employee_id:
         query = query.filter(LeaveRequest.employee_id == employee_id)
@@ -213,6 +228,18 @@ def list_leave_requests(
 
 @router.get("/{request_id}", response_model=LeaveRequestResponse)
 def get_leave_request(request_id: str, db: Session = Depends(get_db)):
+    """Retrieve a specific leave request by its ID.
+
+    Args:
+        request_id (str): The unique identifier of the leave request.
+        db (Session): Database session dependency.
+
+    Returns:
+        dict: The formatted leave request representation.
+
+    Raises:
+        HTTPException: If no leave request with the given ID exists (404 Not Found).
+    """
     leave_request = db.query(LeaveRequest).filter(LeaveRequest.request_id == request_id).first()
     if not leave_request:
         raise HTTPException(

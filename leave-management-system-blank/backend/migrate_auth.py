@@ -2,6 +2,7 @@ import psycopg2
 from app.config import settings
 
 def migrate():
+    """Migrate the database schema by adding role and password columns to the employees table."""
     conn = psycopg2.connect(settings.DATABASE_URL)
     cur = conn.cursor()
     try:

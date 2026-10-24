@@ -3,12 +3,26 @@ import httpx
 BASE_URL = "http://127.0.0.1:8000/api"
 
 def get_headers(employee_id: str, role: str = "employee") -> dict:
+    """Create request headers for a given employee and role.
+
+    Args:
+        employee_id (str): The unique identifier of the employee.
+        role (str, optional): The role of the employee; defaults to "employee".
+
+    Returns:
+        dict: A dictionary containing the Authorization and X-Employee-ID headers.
+    """
     return {
         "Authorization": f"Bearer session-{employee_id}-{role}",
         "X-Employee-ID": employee_id,
     }
 
 def test_user_specific_outbox_security():
+    """Verify user-specific outbox access control and cross-user isolation.
+
+    Raises:
+        AssertionError: If any of the access control checks fail.
+    """
     print("==================================================================")
     print("  TESTING USER-SPECIFIC OUTBOX ACCESS CONTROL & CROSS-USER ISOLATION")
     print("==================================================================")
